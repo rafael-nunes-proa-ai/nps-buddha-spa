@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    image: app_stack:latest
+    container_name: app_stack
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
+    depends_on:
+      - postgres
+    networks:
+      - app_network
+
+  postgres:
+    image: postgres:15
+    container_name: app_postgres
+    environment:
+      POSTGRES_DB: mcp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge

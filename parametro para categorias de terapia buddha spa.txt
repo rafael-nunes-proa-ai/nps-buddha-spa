@@ -1,0 +1,28 @@
+massagem relaxante - "nome" "relaxante"
+
+brazilian massagem - "nome" "brazilian"
+
+shiatsu - "nome" "shiatsu"
+
+massagem ayurvédica - "nome" "Ayurvedica"
+
+Reflexologia - "nome" "reflexologia"
+
+indian head - "nome" "Indian Head"
+
+
+
+Spa relax - "nome" "Day Spa"
+
+mini Day Spa - "nome" "Mini Day Spa"
+
+Experiência Beauty - "nome" "casal"
+
+
+
+
+Drenagem corporal - "categoria" '9" - "nome" "drenagem"
+
+massagem modelador - "nome" "modeladora"
+
+Tratamentos faciais - "nome" "facial"
