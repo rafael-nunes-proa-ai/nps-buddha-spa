@@ -1,14 +1,23 @@
 services:
   app:
     build: .
-    image: app_stack:latest
-    container_name: app_stack
+    image: nps_stack:latest
+    container_name: nps_stack
     ports:
-      - "8080:8080"
+      - "8082:8082"
     env_file:
       - .env
     environment:
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
+      PORT: 8082
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      DB_HOST: postgres
+      DB_NAME: nps_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
     depends_on:
       - postgres
     networks:
@@ -16,16 +25,16 @@ services:
 
   postgres:
     image: postgres:15
-    container_name: app_postgres
+    container_name: nps_postgres
     environment:
-      POSTGRES_DB: mcp
+      POSTGRES_DB: nps_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./store/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     networks:
       - app_network
 

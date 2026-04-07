@@ -9,48 +9,13 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from agents.agent_new import voucher_agent, moderator_agent, cadastro_agent, agendamento_agent
-#from store.db import add_messages, delete_session, get_messages, check_sessions, update_context
+from agents.agente_nps import nps_agent
 from dataclasses import dataclass
 from fastapi.middleware.cors import CORSMiddleware
 from security.auth import verificar_api_key
 from typing import List, Dict, Any, Optional, Union
-#from store import db
 from fastapi.encoders import jsonable_encoder
 import threading
-from services.users import get_user
-from agents.agent_new import voucher_agent, moderator_agent, cadastro_agent, agendamento_agent, cancelamento_agent, reagendamento_agent
-
-
-def _validar_campos_cadastro(user_data: dict) -> tuple:
-    """
-    Valida se todos os campos obrigatórios do cadastro estão preenchidos e válidos.
-    
-    Returns:
-        tuple: (cadastro_completo: bool, campos_faltantes: list)
-    """
-    campos_obrigatorios = {
-        "nome": user_data.get("nome"),
-        "cpf": user_data.get("cpf"),
-        "celular": user_data.get("celular"),
-        "email": user_data.get("email"),
-        "dtNascimento": user_data.get("dtNascimento"),
-        "genero": user_data.get("sexo")  # API retorna "sexo"
-    }
-    
-    campos_faltantes = []
-    
-    for campo, valor in campos_obrigatorios.items():
-        # Verifica se está vazio, None, ou inválido
-        if not valor or str(valor).strip() == "":
-            campos_faltantes.append(campo)
-        # Valida dtNascimento específico (0000-00-00 é inválido)
-        elif campo == "dtNascimento" and str(valor) in ["0000-00-00", "00/00/0000", ""]:
-            campos_faltantes.append(campo)
-    
-    cadastro_completo = len(campos_faltantes) == 0
-    
-    return cadastro_completo, campos_faltantes
 
 from store.database import cleanup_sessions
 from agents.deps import MyDeps
@@ -93,11 +58,7 @@ class ChatRequest(BaseModel):
     phone: Optional[str] = Field(default=None)
 
 AGENTS = {
-    "voucher_agent": voucher_agent,
-    "cadastro_agent": cadastro_agent,
-    "agendamento_agent": agendamento_agent,
-    "cancelamento_agent": cancelamento_agent,
-    "reagendamento_agent": reagendamento_agent
+    "nps_agent": nps_agent
 }
 
 # =========================
@@ -142,79 +103,6 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     current_agent = session[1]
 
     print("DEBUG CURRENT_AGENT:", current_agent)
-    print("DEBUG TYPE:", type(current_agent))
-
-    # defesa: se vier tupla tipo ('agendamento_agent',)
-    if isinstance(current_agent, (list, tuple)):
-        current_agent = current_agent[0] if current_agent else None
-
-    # defesa: se vier None/vazio
-    if not current_agent:
-        current_agent = "voucher_agent"
-
-    # telefone - CONSULTA AUTOMÁTICA DE CADASTRO
-    celular = context.get("celular")
-
-    if req.phone is not None and celular is None:
-
-        user = get_user(req.phone)
-
-        if "erro" not in user:
-            # Valida se cadastro está completo
-            cadastro_completo, campos_faltantes = _validar_campos_cadastro(user)
-
-            data = {
-                "codigo_usuario": user.get("codigo"),
-                "nome": user.get("nome"),
-                "cpf": user.get("cpf"),
-                "celular": user.get("celular"),
-                "email": user.get("email"),
-                "dtNascimento": user.get("dtNascimento"),
-                "genero": user.get("sexo"),
-                "cadastro_completo": cadastro_completo,
-                "campos_faltantes": campos_faltantes if not cadastro_completo else []
-            }
-
-            update_context(req.conversation_id, data)
-
-            context.update(data)
-            celular = user.get("celular")
-    
-    # CONSULTA AUTOMÁTICA DE CADASTRO (se estiver no cadastro_agent e tiver phone)
-    if current_agent == "cadastro_agent" and req.phone is not None and not context.get("cadastro_completo"):
-        print("=" * 80)
-        print(" CONSULTA AUTOMÁTICA DE CADASTRO")
-        print(f"Phone recebido: {req.phone}")
-        print("=" * 80)
-        
-        # Se ainda não consultou, consulta agora
-        if not context.get("codigo_usuario"):
-            user = get_user(req.phone)
-            if "erro" not in user:
-                # Valida se cadastro está completo
-                cadastro_completo, campos_faltantes = _validar_campos_cadastro(user)
-                
-                data = {
-                    "codigo_usuario": user.get("codigo"),
-                    "nome": user.get("nome"),
-                    "cpf": user.get("cpf"),
-                    "celular": user.get("celular"),
-                    "email": user.get("email"),
-                    "dtNascimento": user.get("dtNascimento"),
-                    "genero": user.get("sexo"),
-                    "cadastro_completo": cadastro_completo,
-                    "campos_faltantes": campos_faltantes if not cadastro_completo else []
-                }
-                update_context(req.conversation_id, data)
-                context.update(data)
-                
-                if cadastro_completo:
-                    print(f"✅ Cadastro encontrado e COMPLETO: {user.get('nome')}")
-                else:
-                    print(f"⚠️ Cadastro encontrado mas INCOMPLETO: {user.get('nome')}")
-                    print(f"   Campos faltantes: {campos_faltantes}")
-            else:
-                print("⚠️ Cadastro não encontrado, usuário precisará criar novo")
 
     # histórico de mensagens
     history = get_messages(req.conversation_id)
@@ -623,7 +511,7 @@ if __name__ == "__main__":
     try:
         session_check_thread = threading.Thread(target=cleanup_sessions, daemon=True)
         session_check_thread.start()
-        port = int(os.getenv("PORT", 8080))
+        port = int(os.getenv("PORT", 8082))
         workers = int(os.getenv("WORKERS", 1))
         reload = bool(os.getenv("RELOAD", False) == True)
         print(f"Starting server on port {port} with {workers} workers and reload={reload}")

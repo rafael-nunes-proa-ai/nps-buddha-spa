@@ -87,3 +87,14 @@ class MyDeps:
     
     # TRACKING DE NAVEGAÇÃO
     steps: Optional[list[str]] = None  # Histórico de steps percorridos pelo usuário
+    
+    # CAMPOS ESPECÍFICOS DO NPS
+    nota_profissional: Optional[int] = None  # Nota de 1 a 5 para o profissional
+    nota_unidade: Optional[int] = None  # Nota de 1 a 5 para a unidade
+    feedback_texto: Optional[str] = None  # Feedback textual opcional
+    profissional: Optional[str] = None  # Nome do profissional avaliado
+    codigo_agendamento: Optional[str] = None  # Código do agendamento
+    unidade_codigo: Optional[str] = None  # Código da unidade
+    telefone: Optional[str] = None  # Telefone do cliente
+    hsm_template_id: Optional[str] = None  # ID do template HSM usado
+    hsm_metadata: Optional[dict] = None  # Metadados adicionais do HSM

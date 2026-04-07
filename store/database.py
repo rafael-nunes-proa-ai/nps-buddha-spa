@@ -28,7 +28,7 @@ def ensure_session(session_id: str):
         INSERT INTO sessions (session_id, current_agent, context, last_updated)
         VALUES (%s, %s, %s::jsonb, NOW())
         ON CONFLICT (session_id) DO NOTHING
-    """, (session_id, "voucher_agent", "{}"))
+    """, (session_id, "nps_agent", "{}"))
     conn.commit()
     cur.close()
     conn.close()
@@ -205,3 +205,88 @@ def cleanup_sessions(ttl_days: int = 7, interval_hours: int = 24):
         except Exception as e:
             print(f"[CLEANUP] Error: {e}")
             time.sleep(interval_hours * 3600)
+
+# ============================================================================
+# FUNÇÕES ESPECÍFICAS DO NPS
+# ============================================================================
+
+def salvar_avaliacao_nps(
+    session_id: str,
+    telefone: str = None,
+    nome_cliente: str = None,
+    profissional: str = None,
+    codigo_agendamento: str = None,
+    unidade_codigo: str = "1",
+    nota_profissional: int = None,
+    nota_unidade: int = None,
+    feedback_texto: str = None,
+    hsm_template_id: str = None,
+    hsm_metadata: dict = None
+) -> int:
+    """
+    Salva uma avaliação NPS no banco de dados.
+    
+    Args:
+        session_id: ID da sessão
+        telefone: Telefone do cliente
+        nome_cliente: Nome do cliente
+        profissional: Nome do profissional avaliado
+        codigo_agendamento: Código do agendamento
+        unidade_codigo: Código da unidade (padrão: "1")
+        nota_profissional: Nota de 1 a 5 para o profissional
+        nota_unidade: Nota de 1 a 5 para a unidade
+        feedback_texto: Feedback textual (opcional)
+        hsm_template_id: ID do template HSM usado
+        hsm_metadata: Metadados adicionais do HSM
+    
+    Returns:
+        int: ID da avaliação inserida
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            INSERT INTO avaliacoes_nps (
+                session_id,
+                telefone,
+                nome_cliente,
+                profissional,
+                codigo_agendamento,
+                unidade_codigo,
+                nota_profissional,
+                nota_unidade,
+                feedback_texto,
+                hsm_template_id,
+                hsm_metadata
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb
+            )
+            RETURNING id
+        """, (
+            session_id,
+            telefone,
+            nome_cliente,
+            profissional,
+            codigo_agendamento,
+            unidade_codigo,
+            nota_profissional,
+            nota_unidade,
+            feedback_texto,
+            hsm_template_id,
+            json.dumps(hsm_metadata) if hsm_metadata else None
+        ))
+        
+        avaliacao_id = cur.fetchone()[0]
+        conn.commit()
+        
+        print(f"✅ Avaliação NPS salva com sucesso! ID: {avaliacao_id}")
+        return avaliacao_id
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Erro ao salvar avaliação NPS: {e}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
