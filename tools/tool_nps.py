@@ -47,12 +47,14 @@ async def validar_nota_profissional(ctx: RunContext[MyDeps], nota: str) -> str:
     if nota_extraida is None:
         return "❌ Não consegui identificar a nota. Por favor, escolha uma opção de 1 a 5."
     
-    # Armazena no contexto
+    # Armazena no contexto e marca flag para exibir lista de avaliação da unidade
     update_context(conversation_id, {
-        "nota_profissional": nota_extraida
+        "nota_profissional": nota_extraida,
+        "nps_unidade": True
     })
     
     print(f"✅ Nota profissional armazenada: {nota_extraida}")
+    print(f"✅ Flag nps_unidade marcada como True")
     print("=" * 80)
     
     return f"NOTA_PROFISSIONAL_VALIDA|{nota_extraida}"
