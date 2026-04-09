@@ -19,7 +19,6 @@ import threading
 
 from store.database import cleanup_sessions
 from agents.deps import MyDeps
-import logfire
 from store.database import (
     ensure_session,
     get_session,

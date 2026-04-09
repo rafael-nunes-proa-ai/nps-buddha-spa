@@ -7,7 +7,6 @@ import os
 from pydantic_ai import Agent
 from pydantic_ai.models.bedrock import BedrockConverseModel
 from dotenv import load_dotenv
-import logfire
 from agents.deps import MyDeps
 from tools.tool_nps import (
     validar_nota_profissional,
