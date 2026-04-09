@@ -92,12 +92,14 @@ async def validar_nota_unidade(ctx: RunContext[MyDeps], nota: str) -> str:
     if nota_extraida is None:
         return "❌ Não consegui identificar a nota. Por favor, escolha uma opção de 1 a 5."
     
-    # Armazena no contexto
+    # Armazena no contexto e reseta flag nps_unidade para evitar loop
     update_context(conversation_id, {
-        "nota_unidade": nota_extraida
+        "nota_unidade": nota_extraida,
+        "nps_unidade": False
     })
     
     print(f"✅ Nota unidade armazenada: {nota_extraida}")
+    print(f"✅ Flag nps_unidade resetada para False")
     print("=" * 80)
     
     return f"NOTA_UNIDADE_VALIDA|{nota_extraida}"
