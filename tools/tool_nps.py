@@ -232,6 +232,8 @@ async def encerrar_pesquisa(ctx: RunContext[MyDeps]) -> str:
     Returns:
         Confirmação
     """
+    from store.database import get_session
+    
     conversation_id = ctx.deps.session_id
     
     print("=" * 80)
@@ -239,10 +241,25 @@ async def encerrar_pesquisa(ctx: RunContext[MyDeps]) -> str:
     print(f"Conversation ID: {conversation_id}")
     print("=" * 80)
     
+    # Verifica se sessão existe antes de deletar
+    session_antes = get_session(conversation_id)
+    if session_antes:
+        print(f"📊 Sessão encontrada no banco antes de deletar")
+    else:
+        print("⚠️  Sessão não encontrada no banco")
+    
     # Deleta a sessão
+    print("🗑️  Deletando sessão do banco de dados...")
     delete_session(conversation_id)
     
-    print("✅ Pesquisa encerrada, sessão deletada")
+    # Verifica se sessão foi realmente deletada
+    session_depois = get_session(conversation_id)
+    if session_depois is None:
+        print("✅ CONFIRMADO: Sessão deletada com sucesso do banco de dados")
+    else:
+        print("❌ ERRO: Sessão ainda existe no banco após delete_session()")
+    
+    print("✅ Pesquisa encerrada")
     print("=" * 80)
     
     return "PESQUISA_ENCERRADA"

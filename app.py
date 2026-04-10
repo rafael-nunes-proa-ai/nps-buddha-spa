@@ -54,9 +54,45 @@ async def read_root():
 @app.post("/chat")
 async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key)):
     """Endpoint principal para processar mensagens do NPS"""
+    from store.database import delete_session
     
     message = req.message
     conversation_id = req.conversation_id
+    
+    # Comando manual de encerramento - Detecta palavras e deleta sessão
+    if message and isinstance(message, str) and message.lower() in ["sair", "encerrar"]:
+        print("=" * 80)
+        print("🔴 FINALIZAR_SESSAO - PALAVRA DE ENCERRAMENTO DETECTADA")
+        print(f"Conversation ID: {conversation_id}")
+        print(f"Mensagem recebida: {message}")
+        print("=" * 80)
+        
+        # Verifica se sessão existe antes de deletar
+        session_antes = get_session(conversation_id)
+        if session_antes:
+            print(f"📊 Sessão encontrada no banco:")
+            print(f"   - Última atualização: {session_antes[3]}")
+        else:
+            print("⚠️  Sessão não encontrada no banco (pode já ter sido deletada)")
+        
+        print("🗑️  Deletando sessão do banco de dados...")
+        delete_session(conversation_id)
+        
+        # Verifica se sessão foi realmente deletada
+        session_depois = get_session(conversation_id)
+        if session_depois is None:
+            print("✅ CONFIRMADO: Sessão deletada com sucesso do banco de dados")
+        else:
+            print("❌ ERRO: Sessão ainda existe no banco após delete_session()")
+            print(f"   Dados da sessão: {session_depois}")
+        
+        print("🚩 Flag finalizar_sessao: TRUE")
+        print("📤 Retornando resposta de despedida para React Flow")
+        print("=" * 80)
+        return {
+            "response": "Obrigado por participar da nossa pesquisa de satisfação! 😊\n\nSua opinião é muito importante para nós!",
+            "finalizar_sessao": True  # Flag para React Flow encerrar
+        }
 
     # Garante que sessão existe
     ensure_session(conversation_id)
@@ -107,12 +143,17 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # Salva mensagens no histórico
     add_messages(conversation_id, result.new_messages())
     
-    # Verifica se sessão foi deletada (encerramento)
+    # Verifica se sessão foi deletada (encerramento via tool)
     session_after = get_session(conversation_id)
     if session_after is None:
+        print("🔴 Sessão foi deletada (encerramento via tool). Retornando resposta final.")
+        print("🚩 Flag finalizar_sessao: TRUE")
         print("✅ NPS - Pesquisa encerrada")
         print("=" * 80)
-        return {"response": output_text}
+        return {
+            "response": output_text,
+            "finalizar_sessao": True  # Flag para React Flow encerrar
+        }
     
     # Busca contexto atualizado para incluir flags
     context_updated = session_after[2] or {}

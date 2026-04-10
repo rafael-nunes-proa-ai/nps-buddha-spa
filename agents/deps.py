@@ -23,6 +23,9 @@ class MyDeps:
     # CONTROLE DE FLUXO
     nps_unidade: Optional[bool] = None  # Flag para exibir lista de avaliação da unidade
     
+    # CONTROLE DE FINALIZAÇÃO
+    finalizar_sessao: Optional[bool] = None  # Flag para React Flow encerrar conversa
+    
     # METADADOS HSM
     hsm_template_id: Optional[str] = None
     hsm_metadata: Optional[dict] = None
