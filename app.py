@@ -119,8 +119,8 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # VALIDAÇÃO: EVITAR REPROCESSAMENTO
     # =========================================================================
     
-    # DESABILITADO TEMPORARIAMENTE - React Flow está em loop infinito
-    # TODO: Corrigir no React Flow para reconhecer opções e parar de reenviar
+    # DESABILITADO TEMPORARIAMENTE - Causando loop infinito
+    # TODO: Corrigir no React Flow para não reenviar mensagens
     # Verifica se a última mensagem do usuário é igual à mensagem atual
     # Isso evita que o React Flow reenvie a mesma mensagem após receber opções
     if False and len(history) > 0:
@@ -149,38 +149,54 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         
         # Se a mensagem atual é igual à última mensagem do usuário
         if last_user_message and last_user_message == message:
+            # Conta quantas vezes essa mensagem aparece no histórico
+            count_same_message = 0
+            for msg in history:
+                if hasattr(msg, 'parts') and msg.parts:
+                    for part in msg.parts:
+                        if type(part).__name__ == 'UserPromptPart' and part.content == message:
+                            count_same_message += 1
+            
             print("=" * 80)
             print("⚠️  REPROCESSAMENTO DETECTADO!")
             print(f"Mensagem atual: {message}")
             print(f"Última mensagem do usuário: {last_user_message}")
-            print("� Retornando última resposta (opções) novamente")
-            print("=" * 80)
+            print(f"Quantidade de vezes no histórico: {count_same_message}")
             
-            # Busca a última resposta do modelo no histórico (as opções)
-            for msg in reversed(history):
-                if hasattr(msg, 'parts') and msg.parts:
-                    for part in msg.parts:
-                        if type(part).__name__ == 'TextPart':
-                            # Tenta parsear como JSON de opções
-                            try:
-                                content = part.content
-                                # Remove markdown se existir
-                                if content.startswith("```json"):
-                                    content = content.replace("```json", "").replace("```", "").strip()
-                                elif content.startswith("```"):
-                                    content = content.replace("```", "").strip()
-                                
-                                parsed = json.loads(content)
-                                if isinstance(parsed, dict) and "generic" in parsed:
-                                    print("✅ Retornando opções do histórico")
-                                    return parsed
-                            except:
-                                pass
-            
-            # Se não encontrou opções no histórico, retorna mensagem simples
-            return {
-                "response": "Por favor, selecione uma das opções acima."
-            }
+            # Bloqueia apenas se for a PRIMEIRA repetição (2 ocorrências)
+            # Se for a segunda repetição (3+ ocorrências), permite processar
+            if count_same_message == 2:
+                print("🚫 Primeira repetição - BLOQUEANDO")
+                print("=" * 80)
+                
+                # Busca a última resposta do modelo no histórico (as opções)
+                for msg in reversed(history):
+                    if hasattr(msg, 'parts') and msg.parts:
+                        for part in msg.parts:
+                            if type(part).__name__ == 'TextPart':
+                                # Tenta parsear como JSON de opções
+                                try:
+                                    content = part.content
+                                    # Remove markdown se existir
+                                    if content.startswith("```json"):
+                                        content = content.replace("```json", "").replace("```", "").strip()
+                                    elif content.startswith("```"):
+                                        content = content.replace("```", "").strip()
+                                    
+                                    parsed = json.loads(content)
+                                    if isinstance(parsed, dict) and "generic" in parsed:
+                                        print("✅ Retornando opções do histórico")
+                                        return parsed
+                                except:
+                                    pass
+                
+                # Se não encontrou opções no histórico, retorna mensagem simples
+                return {
+                    "response": "Por favor, selecione uma das opções acima."
+                }
+            else:
+                print(f"✅ Repetição {count_same_message} - PERMITINDO processar")
+                print("=" * 80)
 
     # Prepara dependências
     context.setdefault("session_id", conversation_id)
@@ -192,6 +208,53 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     print(f"Mensagem: {message}")
     print(f"Histórico: {len(history)} mensagens")
     print("=" * 80)
+    
+    # =========================================================================
+    # PRIMEIRA MENSAGEM: RETORNA OPÇÕES DE NOTA PROFISSIONAL AUTOMATICAMENTE
+    # =========================================================================
+    
+    if len(history) == 0:
+        print("🎯 PRIMEIRA MENSAGEM - Retornando opções de nota profissional automaticamente")
+        print("=" * 80)
+        
+        # Busca nome do cliente e profissional do contexto
+        nome_cliente = context.get('nome_cliente', 'Cliente')
+        nome_profissional = context.get('nome_profissional', 'profissional')
+        
+        # Cria JSON de opções manualmente
+        opcoes_resposta = {
+            "generic": [
+                {
+                    "response_type": "option",
+                    "title": f"Olá! {nome_cliente}, queremos saber como você se sentiu durante sua experiência com a profissional {nome_profissional}?\nSua opinião é essencial para refletirmos quem faz a diferença e também para evoluirmos onde for preciso.",
+                    "description": "Escolha uma nota",  # Rótulo do botão de lista WhatsApp
+                    "options": [
+                        {"label": "5|Excelente", "value": {"input": {"text": "5"}}},
+                        {"label": "4|Bom", "value": {"input": {"text": "4"}}},
+                        {"label": "3|Regular", "value": {"input": {"text": "3"}}},
+                        {"label": "2|Ruim", "value": {"input": {"text": "2"}}},
+                        {"label": "1|Péssimo", "value": {"input": {"text": "1"}}}
+                    ]
+                }
+            ]
+        }
+        
+        # IMPORTANTE: Adiciona mensagens ao histórico para evitar loop
+        from pydantic_ai.messages import ModelRequest, ModelResponse, UserPromptPart, TextPart
+        
+        # Adiciona mensagem do usuário
+        user_message = ModelRequest(parts=[UserPromptPart(content=message)])
+        add_messages(conversation_id, [user_message])
+        
+        # Adiciona resposta do bot (as opções)
+        bot_message = ModelResponse(parts=[TextPart(content=json.dumps(opcoes_resposta))])
+        add_messages(conversation_id, [bot_message])
+        
+        print(f"✅ Opções geradas para primeira mensagem")
+        print(f"✅ Mensagens adicionadas ao histórico (user + bot)")
+        print("=" * 80)
+        
+        return opcoes_resposta
     
     # Adiciona mensagem do usuário ao histórico ANTES de executar o agente
     from pydantic_ai.messages import ModelRequest, UserPromptPart
@@ -234,8 +297,52 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
                 print("🔄 Output era JSON string - parseado para dict")
                 output_final = parsed_output
         except json.JSONDecodeError:
-            # Se não conseguir parsear, mantém como string
-            pass
+            # ⚠️ VALIDAÇÃO: Se o texto contém palavras relacionadas a avaliação/opções, 
+            # significa que o agente DEVERIA ter chamado a tool mas não chamou
+            # Nesse caso, FORÇAMOS a geração de opções
+            keywords = [
+                "excelente", "péssimo", "1 a 5", "nota de 1",
+                "escolha uma", "opções acima", "avaliar", "avaliação",
+                "profissional", "unidade", "pesquisa de satisfação"
+            ]
+            if any(keyword in cleaned_output.lower() for keyword in keywords):
+                print("⚠️ AGENTE RETORNOU TEXTO AO INVÉS DE OPÇÕES - FORÇANDO GERAÇÃO")
+                print("=" * 80)
+                
+                # Determina o título baseado no contexto
+                nota_prof = context.get('nota_profissional')
+                
+                if nota_prof is None:
+                    # Ainda não tem nota profissional - está pedindo
+                    title = "Por favor, escolha uma nota de 1 a 5 para avaliar o atendimento da profissional:"
+                else:
+                    # Já tem nota profissional - está pedindo nota da unidade
+                    if nota_prof in [1, 2]:
+                        title = "Que pena... 😕\nE o que achou da nossa unidade Buddah Spa?"
+                    elif nota_prof == 3:
+                        title = "Obrigado pela sua avaliação!\nE o que achou da nossa unidade Buddah Spa?"
+                    else:  # 4 ou 5
+                        title = "Que ótimo! 😊\nE o que achou da nossa unidade Buddah Spa?"
+                
+                # Gera opções manualmente
+                output_final = {
+                    "generic": [
+                        {
+                            "response_type": "option",
+                            "title": title,
+                            "description": "Escolha uma nota",  # Rótulo do botão de lista WhatsApp
+                            "options": [
+                                {"label": "5|Excelente", "value": {"input": {"text": "5"}}},
+                                {"label": "4|Bom", "value": {"input": {"text": "4"}}},
+                                {"label": "3|Regular", "value": {"input": {"text": "3"}}},
+                                {"label": "2|Ruim", "value": {"input": {"text": "2"}}},
+                                {"label": "1|Péssimo", "value": {"input": {"text": "1"}}}
+                            ]
+                        }
+                    ]
+                }
+                print(f"✅ Opções geradas automaticamente (fallback)")
+                print("=" * 80)
     
     # =========================================================================
     # SALVAR HISTÓRICO
