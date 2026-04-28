@@ -115,6 +115,73 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # Histórico de mensagens
     history = get_messages(conversation_id)
 
+    # =========================================================================
+    # VALIDAÇÃO: EVITAR REPROCESSAMENTO
+    # =========================================================================
+    
+    # DESABILITADO TEMPORARIAMENTE - React Flow está em loop infinito
+    # TODO: Corrigir no React Flow para reconhecer opções e parar de reenviar
+    # Verifica se a última mensagem do usuário é igual à mensagem atual
+    # Isso evita que o React Flow reenvie a mesma mensagem após receber opções
+    if False and len(history) > 0:
+        print(f"🔍 DEBUG - Verificando histórico para reprocessamento...")
+        print(f"🔍 DEBUG - Total de mensagens no histórico: {len(history)}")
+        
+        last_user_message = None
+        # Procura a última mensagem do usuário no histórico
+        for i, msg in enumerate(reversed(history)):
+            # Debug: mostra tipo e atributos da mensagem
+            print(f"🔍 DEBUG - Mensagem {i}: type={type(msg).__name__}")
+            
+            # Verifica se é ModelRequest com UserPromptPart
+            if hasattr(msg, 'parts') and msg.parts:
+                for part in msg.parts:
+                    part_type = type(part).__name__
+                    print(f"🔍 DEBUG - Mensagem {i} tem part: {part_type}")
+                    
+                    if part_type == 'UserPromptPart':
+                        last_user_message = part.content
+                        print(f"✅ DEBUG - Encontrada última mensagem do usuário: {last_user_message}")
+                        break
+                
+                if last_user_message:
+                    break
+        
+        # Se a mensagem atual é igual à última mensagem do usuário
+        if last_user_message and last_user_message == message:
+            print("=" * 80)
+            print("⚠️  REPROCESSAMENTO DETECTADO!")
+            print(f"Mensagem atual: {message}")
+            print(f"Última mensagem do usuário: {last_user_message}")
+            print("� Retornando última resposta (opções) novamente")
+            print("=" * 80)
+            
+            # Busca a última resposta do modelo no histórico (as opções)
+            for msg in reversed(history):
+                if hasattr(msg, 'parts') and msg.parts:
+                    for part in msg.parts:
+                        if type(part).__name__ == 'TextPart':
+                            # Tenta parsear como JSON de opções
+                            try:
+                                content = part.content
+                                # Remove markdown se existir
+                                if content.startswith("```json"):
+                                    content = content.replace("```json", "").replace("```", "").strip()
+                                elif content.startswith("```"):
+                                    content = content.replace("```", "").strip()
+                                
+                                parsed = json.loads(content)
+                                if isinstance(parsed, dict) and "generic" in parsed:
+                                    print("✅ Retornando opções do histórico")
+                                    return parsed
+                            except:
+                                pass
+            
+            # Se não encontrou opções no histórico, retorna mensagem simples
+            return {
+                "response": "Por favor, selecione uma das opções acima."
+            }
+
     # Prepara dependências
     context.setdefault("session_id", conversation_id)
     deps = MyDeps(**context)
@@ -126,6 +193,12 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     print(f"Histórico: {len(history)} mensagens")
     print("=" * 80)
     
+    # Adiciona mensagem do usuário ao histórico ANTES de executar o agente
+    from pydantic_ai.messages import ModelRequest, UserPromptPart
+    user_message = ModelRequest(parts=[UserPromptPart(content=message)])
+    add_messages(conversation_id, [user_message])
+    print(f"✅ Mensagem do usuário adicionada ao histórico")
+    
     # Executa o agente NPS
     result = await nps_agent.run(
         message,
@@ -133,44 +206,120 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         deps=deps
     )
     
-    # Extrai output
-    try:
-        output_text = result.data if hasattr(result, 'data') and result.data else result.output
-        output_text = str(output_text)
-    except:
-        output_text = str(result.output)
+    # =========================================================================
+    # EXTRAÇÃO E PARSING DO OUTPUT
+    # =========================================================================
     
-    # Salva mensagens no histórico
+    # Extrai output do resultado do agente
+    output_raw = None
+    try:
+        output_raw = result.data if hasattr(result, 'data') and result.data else result.output
+    except:
+        output_raw = result.output
+    
+    # Se output for string JSON, tenta parsear para dict
+    output_final = output_raw
+    if isinstance(output_raw, str):
+        # Remove formatação markdown se existir (```json ... ```)
+        cleaned_output = output_raw.strip()
+        if cleaned_output.startswith("```json"):
+            cleaned_output = cleaned_output.replace("```json", "").replace("```", "").strip()
+        elif cleaned_output.startswith("```"):
+            cleaned_output = cleaned_output.replace("```", "").strip()
+        
+        try:
+            parsed_output = json.loads(cleaned_output)
+            # Se conseguiu parsear e tem 'generic', usa o objeto parseado
+            if isinstance(parsed_output, dict) and "generic" in parsed_output:
+                print("🔄 Output era JSON string - parseado para dict")
+                output_final = parsed_output
+        except json.JSONDecodeError:
+            # Se não conseguir parsear, mantém como string
+            pass
+    
+    # =========================================================================
+    # SALVAR HISTÓRICO
+    # =========================================================================
+    
     add_messages(conversation_id, result.new_messages())
     
-    # Verifica se sessão foi deletada (encerramento via tool)
+    # =========================================================================
+    # VERIFICAR SE SESSÃO FOI ENCERRADA
+    # =========================================================================
+    
     session_after = get_session(conversation_id)
-    if session_after is None:
+    is_session_deleted = session_after is None
+    
+    if is_session_deleted:
         print("🔴 Sessão foi deletada (encerramento via tool). Retornando resposta final.")
         print("🚩 Flag finalizar_sessao: TRUE")
         print("✅ NPS - Pesquisa encerrada")
         print("=" * 80)
-        return {
-            "response": output_text,
-            "finalizar_sessao": True  # Flag para React Flow encerrar
+        
+        # Verifica se é dict com generic (opções)
+        is_option_response = isinstance(output_final, dict) and "generic" in output_final
+        
+        if is_option_response:
+            print("📋 Resposta contém opções (formato output.generic)")
+            print(f"📤 Retornando objeto direto com finalizar_sessao")
+            # Adiciona flag de finalização ao objeto
+            output_final["finalizar_sessao"] = True
+            return output_final
+        
+        # Resposta de texto com flag de finalização
+        response_text = {
+            "response": str(output_final),
+            "finalizar_sessao": True
         }
+        return response_text
     
-    # Busca contexto atualizado para incluir flags
-    context_updated = session_after[2] or {}
-    if isinstance(context_updated, str):
-        try:
-            context_updated = json.loads(context_updated) if context_updated else {}
-        except:
-            context_updated = {}
+    # =========================================================================
+    # DEBUG E PREPARAÇÃO DO RETORNO
+    # =========================================================================
     
-    print(f"✅ NPS - Resposta: {output_text}")
+    print(f"✅ NPS - Resposta: {output_final}")
+    print(f"🔍 DEBUG - Tipo do output: {type(output_final)}")
+    
+    is_dict = isinstance(output_final, dict)
+    print(f"🔍 DEBUG - É dict? {is_dict}")
+    
+    if is_dict:
+        dict_keys = output_final.keys()
+        has_generic = "generic" in output_final
+        print(f"🔍 DEBUG - Chaves do dict: {dict_keys}")
+        print(f"🔍 DEBUG - Tem 'generic'? {has_generic}")
+        print(f"🔍 DEBUG - Conteúdo completo do dict:")
+        print(f"   {json.dumps(output_final, ensure_ascii=False, indent=2)}")
+    else:
+        output_preview = str(output_final)[:200]
+        print(f"🔍 DEBUG - Conteúdo (não é dict): {output_preview}")
+    
     print("=" * 80)
     
-    # Retorna resposta com flag nps_unidade se existir
-    return {
-        "response": output_text,
-        "nps_unidade": context_updated.get("nps_unidade", False)
+    # =========================================================================
+    # RETORNO FINAL
+    # =========================================================================
+    
+    # Verifica se é resposta com opções (formato output.generic)
+    is_option_response = isinstance(output_final, dict) and "generic" in output_final
+    
+    if is_option_response:
+        print("📋 Resposta contém opções (formato output.generic)")
+        print(f"📤 RETORNO FINAL (dict direto):")
+        print(f"   Type: {type(output_final)}")
+        print(f"   Content: {json.dumps(output_final, ensure_ascii=False, indent=2)}")
+        print("=" * 80)
+        return output_final
+    
+    # Resposta de texto normal com wrapper
+    response_text = {
+        "response": str(output_final)
     }
+    print(f"📤 RETORNO FINAL (texto com wrapper):")
+    print(f"   Type: {type(response_text)}")
+    print(f"   Content: {json.dumps(response_text, ensure_ascii=False, indent=2)}")
+    print("=" * 80)
+    return response_text
 
 
 # =========================

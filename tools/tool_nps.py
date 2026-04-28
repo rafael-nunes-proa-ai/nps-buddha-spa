@@ -47,14 +47,12 @@ async def validar_nota_profissional(ctx: RunContext[MyDeps], nota: str) -> str:
     if nota_extraida is None:
         return "❌ Não consegui identificar a nota. Por favor, escolha uma opção de 1 a 5."
     
-    # Armazena no contexto e marca flag para exibir lista de avaliação da unidade
+    # Armazena no contexto
     update_context(conversation_id, {
-        "nota_profissional": nota_extraida,
-        "nps_unidade": True
+        "nota_profissional": nota_extraida
     })
     
     print(f"✅ Nota profissional armazenada: {nota_extraida}")
-    print(f"✅ Flag nps_unidade marcada como True")
     print("=" * 80)
     
     return f"NOTA_PROFISSIONAL_VALIDA|{nota_extraida}"
@@ -92,14 +90,12 @@ async def validar_nota_unidade(ctx: RunContext[MyDeps], nota: str) -> str:
     if nota_extraida is None:
         return "❌ Não consegui identificar a nota. Por favor, escolha uma opção de 1 a 5."
     
-    # Armazena no contexto e reseta flag nps_unidade para evitar loop
+    # Armazena no contexto
     update_context(conversation_id, {
-        "nota_unidade": nota_extraida,
-        "nps_unidade": False
+        "nota_unidade": nota_extraida
     })
     
     print(f"✅ Nota unidade armazenada: {nota_extraida}")
-    print(f"✅ Flag nps_unidade resetada para False")
     print("=" * 80)
     
     return f"NOTA_UNIDADE_VALIDA|{nota_extraida}"
@@ -266,14 +262,43 @@ async def encerrar_pesquisa(ctx: RunContext[MyDeps]) -> str:
 
 
 # ============================================================================
-# TOOL 6: Gerar Lista Interativa WhatsApp
+# TOOL 6: Gerar Opções de Notas no Formato Canônico
 # ============================================================================
 
-def gerar_lista_notas() -> str:
+@Tool
+async def gerar_opcoes_notas(ctx: RunContext[MyDeps], title: str) -> dict:
     """
-    Gera a lista interativa de notas no formato WhatsApp.
+    Gera opções de notas (1-5) no formato canônico para React Flow.
+    
+    Args:
+        title: Título/pergunta a ser exibida acima das opções
     
     Returns:
-        String formatada para lista interativa
+        Dict com estrutura output.generic
     """
-    return "Lista [[5|Excelente]][[4|Bom]][[3|Regular]][[2|Ruim]][[1|Péssimo]]"
+    print("=" * 80)
+    print("🔍 TOOL: gerar_opcoes_notas")
+    print(f"Title: {title}")
+    print("=" * 80)
+    
+    # Formato correto: output.generic array
+    output = {
+        "generic": [
+            {
+                "response_type": "option",
+                "title": title,
+                "options": [
+                    {"label": "5|Excelente", "value": {"input": {"text": "5"}}},
+                    {"label": "4|Bom", "value": {"input": {"text": "4"}}},
+                    {"label": "3|Regular", "value": {"input": {"text": "3"}}},
+                    {"label": "2|Ruim", "value": {"input": {"text": "2"}}},
+                    {"label": "1|Péssimo", "value": {"input": {"text": "1"}}}
+                ]
+            }
+        ]
+    }
+    
+    print(f"✅ Objeto gerado: {str(output)[:100]}...")
+    print("=" * 80)
+    
+    return output

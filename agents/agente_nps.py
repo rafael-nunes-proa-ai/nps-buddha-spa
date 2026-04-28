@@ -14,7 +14,7 @@ from tools.tool_nps import (
     armazenar_feedback,
     salvar_avaliacao_completa,
     encerrar_pesquisa,
-    gerar_lista_notas
+    gerar_opcoes_notas
 )
 
 load_dotenv()
@@ -34,7 +34,8 @@ nps_agent = Agent(
         validar_nota_unidade,
         armazenar_feedback,
         salvar_avaliacao_completa,
-        encerrar_pesquisa
+        encerrar_pesquisa,
+        gerar_opcoes_notas
     ],
     system_prompt="""
 # VOCÊ É O ASSISTENTE DE PESQUISA NPS DO BUDDHA SPA
@@ -61,21 +62,25 @@ O cliente responderá com uma nota de 1 a 5.
 ### ETAPA 2 - PESQUISA DA UNIDADE (baseada na nota do profissional)
 
 **Se nota profissional foi 1 ou 2:**
-Responda:
-"Que pena... 😕
-E o que achou da nossa unidade Buddah Spa?"
+1. Use a tool `gerar_opcoes_notas` com o título: "Que pena... 😕\nE o que achou da nossa unidade Buddah Spa?"
+2. A tool retornará um JSON - retorne EXATAMENTE esse JSON como sua resposta
 
 **Se nota profissional foi 3:**
-Responda:
-"Obrigado pela sua avaliação! 
-E o que achou da nossa unidade Buddah Spa?"
+1. Use a tool `gerar_opcoes_notas` com o título: "Obrigado pela sua avaliação!\nE o que achou da nossa unidade Buddah Spa?"
+2. A tool retornará um JSON - retorne EXATAMENTE esse JSON como sua resposta
 
 **Se nota profissional foi 4 ou 5:**
-Responda:
-"Que ótimo! 😊
-E o que achou da nossa unidade Buddah Spa?"
+1. Use a tool `gerar_opcoes_notas` com o título: "Que ótimo! 😊\nE o que achou da nossa unidade Buddah Spa?"
+2. A tool retornará um JSON - retorne EXATAMENTE esse JSON como sua resposta
 
-*IMPORTANTE: A tool `validar_nota_profissional` já marcou a flag `nps_unidade: true` no contexto. O sistema detectará essa flag e exibirá automaticamente a lista de opções de avaliação. NÃO envie a lista manualmente.*
+*IMPORTANTE: 
+- Use APENAS a tool `gerar_opcoes_notas` para gerar as opções
+- Retorne EXATAMENTE o JSON que a tool retornar, sem modificar
+- NÃO adicione texto antes ou depois do JSON
+- NÃO use formatação markdown (```json ou ```)
+- NÃO formate o JSON de nenhuma forma
+- Retorne o JSON PURO, direto da tool
+- O JSON será automaticamente parseado e renderizado como opções interativas*
 
 ### ETAPA 3 - VALIDAÇÃO DA NOTA DA UNIDADE
 Quando o cliente responder com a nota da unidade:
@@ -140,20 +145,22 @@ Você tem acesso às seguintes variáveis via `ctx.deps`:
 
 1. **SEMPRE use as tools** para validar e armazenar notas
 2. **NÃO invente** notas ou feedbacks
-3. **NÃO envie listas manualmente** - o sistema exibe automaticamente quando `nps_unidade: true`
-4. **Use o nome do cliente** nas mensagens quando disponível
-5. **Seja educado e empático** em todas as respostas
-6. **NÃO peça feedback** se a nota da unidade for 3, 4 ou 5
-7. **SEMPRE finalize** com as tools de salvar e encerrar
+3. **SEMPRE use `gerar_opcoes_notas`** para exibir opções de avaliação
+4. **Retorne APENAS o JSON** gerado pela tool, sem texto adicional
+5. **Use o nome do cliente** nas mensagens quando disponível
+6. **Seja educado e empático** em todas as respostas
+7. **NÃO peça feedback** se a nota da unidade for 3, 4 ou 5
+8. **SEMPRE finalize** com as tools de salvar e encerrar
 
 ## 📝 EXEMPLO DE FLUXO COMPLETO
 
 **Cliente responde HSM com:** "5"
-→ Tool: validar_nota_profissional("5") → marca `nps_unidade: true`
-→ Bot: "Que ótimo! 😊 E o que achou da nossa unidade Buddah Spa?"
-→ Sistema detecta `nps_unidade: true` e exibe lista de opções automaticamente
+→ Tool: validar_nota_profissional("5")
+→ Tool: gerar_opcoes_notas("Que ótimo! 😊\nE o que achou da nossa unidade Buddah Spa?")
+→ Bot retorna: {"response_type":"option","title":"Que ótimo! 😊\nE o que achou da nossa unidade Buddah Spa?","options":[...]}
+→ React Flow renderiza as opções interativas
 
-**Cliente:** "5"
+**Cliente clica em:** "5"
 → Tool: validar_nota_unidade("5")
 → Bot: "Ficamos muito felizes com isso, Maria!..."
 → Tool: salvar_avaliacao_completa()
@@ -163,7 +170,8 @@ Você tem acesso às seguintes variáveis via `ctx.deps`:
 
 - ❌ NÃO peça informações que já estão no contexto
 - ❌ NÃO pule etapas do fluxo
-- ❌ NÃO envie listas manualmente (o sistema controla isso)
+- ❌ NÃO adicione texto antes ou depois do JSON de opções
+- ❌ NÃO modifique o JSON retornado pela tool
 - ❌ NÃO continue a conversa após encerrar
 - ❌ NÃO peça feedback se nota da unidade >= 3
 """
