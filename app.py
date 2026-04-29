@@ -221,22 +221,23 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         nome_cliente = context.get('nome_cliente', 'Cliente')
         nome_profissional = context.get('nome_profissional', 'profissional')
         
-        # Cria JSON de opções manualmente
+        # Cria JSON de opções manualmente (formato AWS Broker com output)
         opcoes_resposta = {
-            "generic": [
-                {
-                    "response_type": "option",
-                    "title": f"Olá! {nome_cliente}, queremos saber como você se sentiu durante sua experiência com a profissional {nome_profissional}?\nSua opinião é essencial para refletirmos quem faz a diferença e também para evoluirmos onde for preciso.",
-                    "description": "Escolha uma nota",  # Rótulo do botão de lista WhatsApp
-                    "options": [
-                        {"label": "5|Excelente", "value": {"input": {"text": "5"}}},
-                        {"label": "4|Bom", "value": {"input": {"text": "4"}}},
-                        {"label": "3|Regular", "value": {"input": {"text": "3"}}},
-                        {"label": "2|Ruim", "value": {"input": {"text": "2"}}},
-                        {"label": "1|Péssimo", "value": {"input": {"text": "1"}}}
-                    ]
-                }
-            ]
+            "output": {
+                "generic": [
+                    {
+                        "response_type": "option",
+                        "title": f"Olá! {nome_cliente}, queremos saber como você se sentiu durante sua experiência com a profissional {nome_profissional}?\nSua opinião é essencial para refletirmos quem faz a diferença e também para evoluirmos onde for preciso.",
+                        "options": [
+                            {"label": "5", "value": {"input": {"text": "5"}}},
+                            {"label": "4", "value": {"input": {"text": "4"}}},
+                            {"label": "3", "value": {"input": {"text": "3"}}},
+                            {"label": "2", "value": {"input": {"text": "2"}}},
+                            {"label": "1", "value": {"input": {"text": "1"}}}
+                        ]
+                    }
+                ]
+            }
         }
         
         # IMPORTANTE: Adiciona mensagens ao histórico para evitar loop
@@ -246,12 +247,16 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         user_message = ModelRequest(parts=[UserPromptPart(content=message)])
         add_messages(conversation_id, [user_message])
         
-        # Adiciona resposta do bot (as opções)
-        bot_message = ModelResponse(parts=[TextPart(content=json.dumps(opcoes_resposta))])
+        # Adiciona resposta do bot (as opções como dict, não string)
+        bot_message = ModelResponse(parts=[TextPart(content=opcoes_resposta)])
         add_messages(conversation_id, [bot_message])
         
         print(f"✅ Opções geradas para primeira mensagem")
         print(f"✅ Mensagens adicionadas ao histórico (user + bot)")
+        print("=" * 80)
+        print("📤 RETORNO PRIMEIRA MENSAGEM:")
+        print(f"   Type: {type(opcoes_resposta)}")
+        print(f"   Content: {json.dumps(opcoes_resposta, ensure_ascii=False, indent=2)}")
         print("=" * 80)
         
         return opcoes_resposta
@@ -295,7 +300,11 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
             # Se conseguiu parsear e tem 'generic', usa o objeto parseado
             if isinstance(parsed_output, dict) and "generic" in parsed_output:
                 print("🔄 Output era JSON string - parseado para dict")
-                output_final = parsed_output
+                # Envolve com 'output' se não tiver
+                if "output" not in parsed_output:
+                    output_final = {"output": parsed_output}
+                else:
+                    output_final = parsed_output
         except json.JSONDecodeError:
             # ⚠️ VALIDAÇÃO: Se o texto contém palavras relacionadas a avaliação/opções, 
             # significa que o agente DEVERIA ter chamado a tool mas não chamou
@@ -324,22 +333,23 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
                     else:  # 4 ou 5
                         title = "Que ótimo! 😊\nE o que achou da nossa unidade Buddah Spa?"
                 
-                # Gera opções manualmente
+                # Gera opções manualmente (formato AWS Broker com output)
                 output_final = {
-                    "generic": [
-                        {
-                            "response_type": "option",
-                            "title": title,
-                            "description": "Escolha uma nota",  # Rótulo do botão de lista WhatsApp
-                            "options": [
-                                {"label": "5|Excelente", "value": {"input": {"text": "5"}}},
-                                {"label": "4|Bom", "value": {"input": {"text": "4"}}},
-                                {"label": "3|Regular", "value": {"input": {"text": "3"}}},
-                                {"label": "2|Ruim", "value": {"input": {"text": "2"}}},
-                                {"label": "1|Péssimo", "value": {"input": {"text": "1"}}}
-                            ]
-                        }
-                    ]
+                    "output": {
+                        "generic": [
+                            {
+                                "response_type": "option",
+                                "title": title,
+                                "options": [
+                                    {"label": "5", "value": {"input": {"text": "5"}}},
+                                    {"label": "4", "value": {"input": {"text": "4"}}},
+                                    {"label": "3", "value": {"input": {"text": "3"}}},
+                                    {"label": "2", "value": {"input": {"text": "2"}}},
+                                    {"label": "1", "value": {"input": {"text": "1"}}}
+                                ]
+                            }
+                        ]
+                    }
                 }
                 print(f"✅ Opções geradas automaticamente (fallback)")
                 print("=" * 80)
@@ -408,7 +418,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # =========================================================================
     
     # Verifica se é resposta com opções (formato output.generic)
-    is_option_response = isinstance(output_final, dict) and "generic" in output_final
+    is_option_response = isinstance(output_final, dict) and "output" in output_final and "generic" in output_final.get("output", {})
     
     if is_option_response:
         print("📋 Resposta contém opções (formato output.generic)")

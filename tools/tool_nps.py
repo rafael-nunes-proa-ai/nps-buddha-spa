@@ -281,21 +281,23 @@ async def gerar_opcoes_notas(ctx: RunContext[MyDeps], title: str) -> dict:
     print(f"Title: {title}")
     print("=" * 80)
     
-    # Formato correto: output.generic array
+    # Formato AWS Broker com output (sem description, labels simples)
     output = {
-        "generic": [
-            {
-                "response_type": "option",
-                "title": title,
-                "options": [
-                    {"label": "5|Excelente", "value": {"input": {"text": "5"}}},
-                    {"label": "4|Bom", "value": {"input": {"text": "4"}}},
-                    {"label": "3|Regular", "value": {"input": {"text": "3"}}},
-                    {"label": "2|Ruim", "value": {"input": {"text": "2"}}},
-                    {"label": "1|Péssimo", "value": {"input": {"text": "1"}}}
-                ]
-            }
-        ]
+        "output": {
+            "generic": [
+                {
+                    "response_type": "option",
+                    "title": title,
+                    "options": [
+                        {"label": "5", "value": {"input": {"text": "5"}}},
+                        {"label": "4", "value": {"input": {"text": "4"}}},
+                        {"label": "3", "value": {"input": {"text": "3"}}},
+                        {"label": "2", "value": {"input": {"text": "2"}}},
+                        {"label": "1", "value": {"input": {"text": "1"}}}
+                    ]
+                }
+            ]
+        }
     }
     
     print(f"✅ Objeto gerado: {str(output)[:100]}...")
