@@ -126,6 +126,52 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     print(f"Histórico: {len(history)} mensagens")
     print("=" * 80)
     
+    # =========================================================================
+    # PRIMEIRA MENSAGEM: RETORNA OPÇÕES DE NOTA PROFISSIONAL EM JSON
+    # =========================================================================
+    
+    if len(history) == 0:
+        print("🎯 PRIMEIRA MENSAGEM - Retornando opções em JSON")
+        print("=" * 80)
+        
+        # Busca nome do cliente e profissional do contexto
+        nome_cliente = context.get('nome_cliente', 'Cliente')
+        nome_profissional = context.get('nome_profissional', 'profissional')
+        
+        # Cria JSON de opções (formato AWS Broker)
+        opcoes_resposta = {
+            "output": {
+                "generic": [
+                    {
+                        "response_type": "option",
+                        "title": f"Olá! {nome_cliente}, queremos saber como você se sentiu durante sua experiência com a profissional {nome_profissional}?\nSua opinião é essencial para refletirmos quem faz a diferença e também para evoluirmos onde for preciso.",
+                        "options": [
+                            {"label": "5", "value": {"input": {"text": "5"}}},
+                            {"label": "4", "value": {"input": {"text": "4"}}},
+                            {"label": "3", "value": {"input": {"text": "3"}}},
+                            {"label": "2", "value": {"input": {"text": "2"}}},
+                            {"label": "1", "value": {"input": {"text": "1"}}}
+                        ]
+                    }
+                ]
+            },
+            "nps_unidade": True  # Flag para React Flow reconhecer
+        }
+        
+        # IMPORTANTE: Salva mensagens no histórico para evitar loop
+        from pydantic_ai.messages import ModelRequest, ModelResponse, UserPromptPart, TextPart
+        
+        user_message = ModelRequest(parts=[UserPromptPart(content=message)])
+        bot_message = ModelResponse(parts=[TextPart(content=json.dumps(opcoes_resposta, ensure_ascii=False))])
+        add_messages(conversation_id, [user_message, bot_message])
+        
+        print(f"✅ Opções geradas para primeira mensagem")
+        print(f"✅ Mensagens salvas no histórico")
+        print(f"📤 RETORNO: {json.dumps(opcoes_resposta, ensure_ascii=False, indent=2)}")
+        print("=" * 80)
+        
+        return opcoes_resposta
+    
     # Executa o agente NPS
     result = await nps_agent.run(
         message,
@@ -139,6 +185,18 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         output_text = str(output_text)
     except:
         output_text = str(result.output)
+    
+    # Se o agente retornou JSON em vez de texto, extrai o texto do title
+    if output_text.startswith('{') and '"output"' in output_text:
+        try:
+            parsed = json.loads(output_text)
+            if 'output' in parsed and 'generic' in parsed['output']:
+                generic = parsed['output']['generic'][0]
+                if 'title' in generic:
+                    output_text = generic['title']
+                    print(f"⚠️  Agente retornou JSON - Texto extraído do title")
+        except:
+            pass
     
     # Salva mensagens no histórico
     add_messages(conversation_id, result.new_messages())
@@ -166,10 +224,46 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     print(f"✅ NPS - Resposta: {output_text}")
     print("=" * 80)
     
-    # Retorna resposta com flag nps_unidade se existir
+    # =========================================================================
+    # SEGUNDA PERGUNTA: SE FLAG nps_unidade ESTÁ TRUE, RETORNA OPÇÕES EM JSON
+    # =========================================================================
+    # Após validar nota do profissional, a tool marca nps_unidade=True
+    # Aqui detectamos e retornamos as opções de avaliação da unidade em JSON
+    
+    if context_updated.get("nps_unidade", False):
+        print("🎯 FLAG nps_unidade DETECTADA - Retornando opções da unidade em JSON")
+        print("=" * 80)
+        
+        # Cria JSON de opções para avaliação da unidade (formato AWS Broker)
+        opcoes_unidade = {
+            "output": {
+                "generic": [
+                    {
+                        "response_type": "option",
+                        "title": output_text,  # Usa a resposta do agente como título
+                        "options": [
+                            {"label": "5", "value": {"input": {"text": "5"}}},
+                            {"label": "4", "value": {"input": {"text": "4"}}},
+                            {"label": "3", "value": {"input": {"text": "3"}}},
+                            {"label": "2", "value": {"input": {"text": "2"}}},
+                            {"label": "1", "value": {"input": {"text": "1"}}}
+                        ]
+                    }
+                ]
+            },
+            "nps_unidade": True  # Flag para React Flow reconhecer
+        }
+        
+        print(f"✅ Opções da unidade geradas")
+        print(f"📤 RETORNO: {json.dumps(opcoes_unidade, ensure_ascii=False, indent=2)}")
+        print("=" * 80)
+        
+        return opcoes_unidade
+    
+    # Retorna resposta normal (sem opções)
     return {
         "response": output_text,
-        "nps_unidade": context_updated.get("nps_unidade", False)
+        "nps_unidade": False
     }
 
 
