@@ -50,11 +50,11 @@ async def validar_nota_profissional(ctx: RunContext[MyDeps], nota: str) -> str:
     # Armazena no contexto e marca flag para exibir lista de avaliação da unidade
     update_context(conversation_id, {
         "nota_profissional": nota_extraida,
-        "nps_unidade": True
+        "nota_unidade_ativa": True
     })
     
     print(f"✅ Nota profissional armazenada: {nota_extraida}")
-    print(f"✅ Flag nps_unidade marcada como True")
+    print(f"✅ Flag nota_unidade_ativa marcada como True")
     print("=" * 80)
     
     return f"NOTA_PROFISSIONAL_VALIDA|{nota_extraida}"
@@ -92,14 +92,15 @@ async def validar_nota_unidade(ctx: RunContext[MyDeps], nota: str) -> str:
     if nota_extraida is None:
         return "❌ Não consegui identificar a nota. Por favor, escolha uma opção de 1 a 5."
     
-    # Armazena no contexto e reseta flag nps_unidade para evitar loop
+    # Armazena no contexto e desliga TODAS as flags de opções
     update_context(conversation_id, {
         "nota_unidade": nota_extraida,
-        "nps_unidade": False
+        "nota_profissional_ativa": False,
+        "nota_unidade_ativa": False
     })
     
     print(f"✅ Nota unidade armazenada: {nota_extraida}")
-    print(f"✅ Flag nps_unidade resetada para False")
+    print(f"✅ Flags nota_profissional_ativa e nota_unidade_ativa desligadas (False)")
     print("=" * 80)
     
     return f"NOTA_UNIDADE_VALIDA|{nota_extraida}"

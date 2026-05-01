@@ -20,8 +20,10 @@ class MyDeps:
     nota_unidade: Optional[int] = None
     feedback_texto: Optional[str] = None
     
-    # CONTROLE DE FLUXO
-    nps_unidade: Optional[bool] = None  # Flag para exibir lista de avaliação da unidade
+    # CONTROLE DE FLUXO (FLAGS PARA EXIBIR OPÇÕES)
+    nota_profissional_ativa: Optional[bool] = None  # Flag para exibir opções de avaliação do profissional
+    nota_unidade_ativa: Optional[bool] = None  # Flag para exibir opções de avaliação da unidade
+    nps_unidade: Optional[bool] = None  # Flag legada (manter para compatibilidade)
     
     # CONTROLE DE FINALIZAÇÃO
     finalizar_sessao: Optional[bool] = None  # Flag para React Flow encerrar conversa

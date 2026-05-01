@@ -144,7 +144,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
                 "generic": [
                     {
                         "response_type": "option",
-                        "title": f"Olá! {nome_cliente}, queremos saber como você se sentiu durante sua experiência com a profissional {nome_profissional}?\nSua opinião é essencial para refletirmos quem faz a diferença e também para evoluirmos onde for preciso.",
+                        "title": f"Queremos saber como você se sentiu durante sua experiência com a profissional {nome_profissional}?\nSua opinião é essencial para refletirmos quem faz a diferença e também para evoluirmos onde for preciso.",
                         "options": [
                             {"label": "5", "value": {"input": {"text": "5"}}},
                             {"label": "4", "value": {"input": {"text": "4"}}},
@@ -155,7 +155,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
                     }
                 ]
             },
-            "nps_unidade": True  # Flag para React Flow reconhecer
+            "nota_profissional": True  # Flag para React Flow reconhecer
         }
         
         # IMPORTANTE: Salva mensagens no histórico para evitar loop
@@ -225,13 +225,13 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     print("=" * 80)
     
     # =========================================================================
-    # SEGUNDA PERGUNTA: SE FLAG nps_unidade ESTÁ TRUE, RETORNA OPÇÕES EM JSON
+    # SEGUNDA PERGUNTA: SE FLAG nota_unidade_ativa ESTÁ TRUE, RETORNA OPÇÕES EM JSON
     # =========================================================================
-    # Após validar nota do profissional, a tool marca nps_unidade=True
+    # Após validar nota do profissional, a tool marca nota_unidade_ativa=True
     # Aqui detectamos e retornamos as opções de avaliação da unidade em JSON
     
-    if context_updated.get("nps_unidade", False):
-        print("🎯 FLAG nps_unidade DETECTADA - Retornando opções da unidade em JSON")
+    if context_updated.get("nota_unidade_ativa", False):
+        print("🎯 FLAG nota_unidade_ativa DETECTADA - Retornando opções da unidade em JSON")
         print("=" * 80)
         
         # Cria JSON de opções para avaliação da unidade (formato AWS Broker)
@@ -251,7 +251,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
                     }
                 ]
             },
-            "nps_unidade": True  # Flag para React Flow reconhecer
+            "nota_unidade": True  # Flag para React Flow reconhecer
         }
         
         print(f"✅ Opções da unidade geradas")
@@ -262,8 +262,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     
     # Retorna resposta normal (sem opções)
     return {
-        "response": output_text,
-        "nps_unidade": False
+        "response": output_text
     }
 
 
