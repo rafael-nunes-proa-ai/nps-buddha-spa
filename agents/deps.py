@@ -19,6 +19,7 @@ class MyDeps:
     nota_profissional: Optional[int] = None
     nota_unidade: Optional[int] = None
     feedback_texto: Optional[str] = None
+    resposta_feedback_unidade: Optional[str] = None  # Resposta do usuário sobre feedback
     
     # CONTROLE DE FLUXO (FLAGS PARA EXIBIR OPÇÕES)
     nota_profissional_ativa: Optional[bool] = None  # Flag para exibir opções de avaliação do profissional

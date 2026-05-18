@@ -93,17 +93,53 @@ async def validar_nota_unidade(ctx: RunContext[MyDeps], nota: str) -> str:
         return "❌ Não consegui identificar a nota. Por favor, escolha uma opção de 1 a 5."
     
     # Armazena no contexto e desliga TODAS as flags de opções
-    update_context(conversation_id, {
-        "nota_unidade": nota_extraida,
-        "nota_profissional_ativa": False,
-        "nota_unidade_ativa": False
-    })
+    # Para notas 3, 4 e 5, marca que mensagem final será enviada
+    if nota_extraida >= 3:
+        update_context(conversation_id, {
+            "nota_unidade": nota_extraida,
+            "nota_profissional_ativa": False,
+            "nota_unidade_ativa": False,
+            "mensagem_final_enviada": True  # Marca que mensagem final será enviada
+        })
+    else:
+        # Para notas 1 e 2, ainda precisa coletar feedback
+        update_context(conversation_id, {
+            "nota_unidade": nota_extraida,
+            "nota_profissional_ativa": False,
+            "nota_unidade_ativa": False
+        })
     
     print(f"✅ Nota unidade armazenada: {nota_extraida}")
     print(f"✅ Flags nota_profissional_ativa e nota_unidade_ativa desligadas (False)")
+    if nota_extraida >= 3:
+        print(f"✅ Flag mensagem_final_enviada marcada como True (nota {nota_extraida})")
     print("=" * 80)
     
-    return f"NOTA_UNIDADE_VALIDA|{nota_extraida}"
+    # Retorna instruções explícitas baseadas na nota
+    if nota_extraida <= 2:
+        return (
+            f"NOTA_UNIDADE_VALIDA|{nota_extraida}\n"
+            "PRÓXIMO PASSO: Peça feedback ao cliente com a mensagem:\n"
+            '"Por favor, conte o que aconteceu para que possamos entender melhor a situação e buscar uma solução."\n'
+            "Aguarde a resposta e use armazenar_feedback para salvar."
+        )
+    elif nota_extraida == 3:
+        return (
+            f"NOTA_UNIDADE_VALIDA|{nota_extraida}\n"
+            "PRÓXIMO PASSO: NÃO peça feedback. Responda:\n"
+            '"Agradecemos por compartilhar sua experiência.\n'
+            "Suas respostas são muito importantes e nos ajudam a cuidar de cada detalhe com ainda mais atenção.\n\n"
+            'Esperamos receber você novamente em breve.👋"'
+        )
+    else:  # 4 ou 5
+        return (
+            f"NOTA_UNIDADE_VALIDA|{nota_extraida}\n"
+            "PRÓXIMO PASSO: NÃO peça feedback. Responda:\n"
+            '"Ficamos muito felizes com isso!\n'
+            "Sua experiência é muito especial para nós. Se puder, que tal compartilhar sua opinião deixando uma avaliação no Google?\n"
+            "Ela nos ajuda a continuar cuidando de cada detalhe com carinho. https://g.page/r/CCFEE85I5qkEAE/review\n\n"
+            'Será um prazer receber você novamente em breve. Até a próxima! 🥰"'
+        )
 
 
 # ============================================================================
@@ -129,141 +165,23 @@ async def armazenar_feedback(ctx: RunContext[MyDeps], feedback: str) -> str:
     print(f"Feedback: {feedback}")
     print("=" * 80)
     
-    # Armazena no contexto
+    # Armazena no contexto e marca que mensagem final será enviada
     update_context(conversation_id, {
-        "resposta_feedback_unidade": feedback
+        "resposta_feedback_unidade": feedback,
+        "mensagem_final_enviada": True  # Marca que após feedback, mensagem final será enviada
     })
     
     print(f"✅ Feedback armazenado")
+    print(f"✅ Flag mensagem_final_enviada marcada como True (após feedback)")
     print("=" * 80)
     
     return "FEEDBACK_ARMAZENADO"
 
 
 # ============================================================================
-# TOOL 4: Salvar Avaliação Completa no Banco
+# TOOL 4 e 5: DESABILITADAS - Não salva mais em DB
 # ============================================================================
-
-@Tool
-async def salvar_avaliacao_completa(ctx: RunContext[MyDeps]) -> str:
-    """
-    Salva a avaliação completa no banco de dados (tabela avaliacoes_nps).
-    
-    Returns:
-        Confirmação de salvamento
-    """
-    from store.database import salvar_avaliacao_nps
-    
-    conversation_id = ctx.deps.session_id
-    
-    print("=" * 80)
-    print("🔍 TOOL: salvar_avaliacao_completa")
-    print(f"Conversation ID: {conversation_id}")
-    print("=" * 80)
-    
-    # Busca dados do contexto
-    session = get_session(conversation_id)
-    if not session:
-        print("❌ Sessão não encontrada")
-        return "ERRO_SESSAO"
-    
-    context = session[2] or {}
-    if isinstance(context, str):
-        try:
-            context = json.loads(context) if context.strip() else {}
-        except:
-            context = {}
-    
-    # Extrai dados
-    nota_profissional = context.get("nota_profissional")
-    nota_unidade = context.get("nota_unidade")
-    feedback = context.get("resposta_feedback_unidade", "")
-    nome_cliente = context.get("nome", "")
-    telefone = context.get("telefone", conversation_id)
-    profissional = context.get("profissional", "")
-    codigo_agendamento = context.get("codigo_agendamento", "")
-    unidade_codigo = context.get("unidade_codigo", "1")
-    hsm_template_id = context.get("hsm_template_id", "")
-    hsm_metadata = context.get("hsm_metadata", {})
-    
-    print(f"Dados da avaliação:")
-    print(f"  - Nota profissional: {nota_profissional}")
-    print(f"  - Nota unidade: {nota_unidade}")
-    print(f"  - Feedback: {feedback}")
-    print(f"  - Cliente: {nome_cliente}")
-    print(f"  - Telefone: {telefone}")
-    print(f"  - Profissional: {profissional}")
-    
-    try:
-        # Salva no banco de dados
-        avaliacao_id = salvar_avaliacao_nps(
-            session_id=conversation_id,
-            telefone=telefone,
-            nome_cliente=nome_cliente,
-            profissional=profissional,
-            codigo_agendamento=codigo_agendamento,
-            unidade_codigo=unidade_codigo,
-            nota_profissional=nota_profissional,
-            nota_unidade=nota_unidade,
-            feedback_texto=feedback if feedback else None,
-            hsm_template_id=hsm_template_id if hsm_template_id else None,
-            hsm_metadata=hsm_metadata if hsm_metadata else None
-        )
-        
-        print(f"✅ Avaliação salva no banco! ID: {avaliacao_id}")
-        print("=" * 80)
-        
-        return "AVALIACAO_SALVA"
-        
-    except Exception as e:
-        print(f"❌ Erro ao salvar avaliação: {e}")
-        print("=" * 80)
-        return "ERRO_SALVAMENTO"
-
-
-# ============================================================================
-# TOOL 5: Encerrar Pesquisa
-# ============================================================================
-
-@Tool
-async def encerrar_pesquisa(ctx: RunContext[MyDeps]) -> str:
-    """
-    Encerra a pesquisa NPS deletando a sessão.
-    
-    Returns:
-        Confirmação
-    """
-    from store.database import get_session
-    
-    conversation_id = ctx.deps.session_id
-    
-    print("=" * 80)
-    print("🔍 TOOL: encerrar_pesquisa")
-    print(f"Conversation ID: {conversation_id}")
-    print("=" * 80)
-    
-    # Verifica se sessão existe antes de deletar
-    session_antes = get_session(conversation_id)
-    if session_antes:
-        print(f"📊 Sessão encontrada no banco antes de deletar")
-    else:
-        print("⚠️  Sessão não encontrada no banco")
-    
-    # Deleta a sessão
-    print("🗑️  Deletando sessão do banco de dados...")
-    delete_session(conversation_id)
-    
-    # Verifica se sessão foi realmente deletada
-    session_depois = get_session(conversation_id)
-    if session_depois is None:
-        print("✅ CONFIRMADO: Sessão deletada com sucesso do banco de dados")
-    else:
-        print("❌ ERRO: Sessão ainda existe no banco após delete_session()")
-    
-    print("✅ Pesquisa encerrada")
-    print("=" * 80)
-    
-    return "PESQUISA_ENCERRADA"
+# Removido: salvar_avaliacao_completa e encerrar_pesquisa
 
 
 # ============================================================================
