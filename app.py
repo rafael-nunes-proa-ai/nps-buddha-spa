@@ -59,7 +59,7 @@ def retornar_primeira_pergunta(conversation_id: str, message: str, context: dict
                 ]
             }]
         },
-        "nota_profissional": True
+        "botao_profissional": True
     }
     
     # Salva mensagens no histórico
@@ -94,7 +94,7 @@ def retornar_segunda_pergunta(output_text: str) -> dict:
                 ]
             }]
         },
-        "nota_unidade": True
+        "botao_unidade": True
     }
     
     print(f"✅ Opções da unidade geradas")
@@ -112,8 +112,8 @@ def retornar_resposta_normal(output_text: str) -> dict:
     
     resposta = {
         "response": output_text,
-        "nota_profissional": False,
-        "nota_unidade": False
+        "botao_profissional": False,
+        "botao_unidade": False
     }
     
     return resposta
@@ -168,8 +168,8 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         return {
             "response": "Obrigado por participar da nossa pesquisa de satisfação! 😊\n\nSua opinião é muito importante para nós!",
             "finalizar_sessao": True,
-            "nota_profissional": False,
-            "nota_unidade": False
+            "botao_profissional": False,
+            "botao_unidade": False
         }
 
     # Garante que sessão existe
@@ -206,18 +206,32 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # VERIFICAÇÃO: Se mensagem final já foi enviada, encerra na próxima mensagem
     # =========================================================================
     if context.get("mensagem_final_enviada") == True:
+        print("=" * 80)
         print("🎯 MENSAGEM FINAL JÁ FOI ENVIADA - Encerrando sessão")
         print(f"   Nota profissional: {context.get('nota_profissional')}")
         print(f"   Nota unidade: {context.get('nota_unidade')}")
-        print("=" * 80)
+        print(f"   Feedback: {context.get('resposta_feedback_unidade', 'N/A')}")
+        print("🗑️  Deletando sessão do banco de dados...")
         
         delete_session(conversation_id)
         
+        session_depois = get_session(conversation_id)
+        if session_depois is None:
+            print("✅ CONFIRMADO: Sessão deletada com sucesso")
+        else:
+            print("❌ ERRO: Sessão ainda existe após delete_session()")
+        
+        print("🚩 Flag finalizar_sessao: TRUE")
+        print("📤 Retornando mensagem de encerramento COM NOTAS")
+        print("=" * 80)
+        
         return {
             "response": "Obrigado por participar da nossa pesquisa de satisfação! 😊\n\nSua opinião é muito importante para nós!",
+            "nota_profissional": context.get('nota_profissional'),
+            "nota_unidade": context.get('nota_unidade'),
             "finalizar_sessao": True,
-            "nota_profissional": False,
-            "nota_unidade": False
+            "botao_profissional": False,
+            "botao_unidade": False
         }
 
     # Prepara dependências

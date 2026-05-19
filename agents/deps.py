@@ -26,7 +26,12 @@ class MyDeps:
     nota_unidade_ativa: Optional[bool] = None  # Flag para exibir opções de avaliação da unidade
     nps_unidade: Optional[bool] = None  # Flag legada (manter para compatibilidade)
     
+    # FLAGS PARA SISTEMA EXTERNO (ATIVAR/DESATIVAR BOTÕES)
+    botao_profissional: Optional[bool] = None  # Flag para ativar botões de avaliação do profissional
+    botao_unidade: Optional[bool] = None  # Flag para ativar botões de avaliação da unidade
+    
     # CONTROLE DE FINALIZAÇÃO
+    mensagem_final_enviada: Optional[bool] = None  # Flag para indicar que mensagem final foi enviada
     finalizar_sessao: Optional[bool] = None  # Flag para React Flow encerrar conversa
     
     # METADADOS HSM
