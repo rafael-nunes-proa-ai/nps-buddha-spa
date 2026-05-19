@@ -37,3 +37,15 @@ class MyDeps:
     # METADADOS HSM
     hsm_template_id: Optional[str] = None
     hsm_metadata: Optional[dict] = None
+    tituloHSM: Optional[str] = None  # Identificador do fluxo HSM
+    respostaHSM: Optional[str] = None  # Resposta inicial do HSM
+    
+    # CONTROLE DE FLUXO - CONFIRMAÇÃO
+    botao_confirmacao: Optional[bool] = None  # Flag para exibir botões SIM/NÃO (confirmação)
+    botao_reagendar_cancelar: Optional[bool] = None  # Flag para exibir botões Reagendar/Cancelar
+    ir_para_reagendamento: Optional[bool] = None  # Flag para transbordo para reagendamento
+    ir_para_cancelamento: Optional[bool] = None  # Flag para transbordo para cancelamento
+    
+    # CONTROLE DE FLUXO - NO SHOW
+    botao_confirmacao_no_show: Optional[bool] = None  # Flag para exibir botões SIM/NÃO (no show)
+    ir_para_reagendamento_no_show: Optional[bool] = None  # Flag para transbordo para reagendamento no show

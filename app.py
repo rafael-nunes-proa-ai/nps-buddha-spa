@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from typing import Optional, Union, Any
 
 from agents.agente_nps import nps_agent
+from agents.agente_confirmacao import confirmacao_agent
+from agents.agente_no_show import no_show_agent
 from agents.deps import MyDeps
 from security.auth import verificar_api_key
 from store.database import (
@@ -104,19 +106,97 @@ def retornar_segunda_pergunta(output_text: str) -> dict:
     return opcoes_unidade
 
 
-def retornar_resposta_normal(output_text: str) -> dict:
+def retornar_resposta_normal(output_text: str, pesquisa_encerrada: bool = False) -> dict:
     """ETAPA 3: Retorna resposta de texto simples (sem opções)."""
     print(f"📤 RETORNO FINAL (sem opções):")
     print(f"  - response: {output_text[:100]}..." if len(output_text) > 100 else f"  - response: {output_text}")
+    if pesquisa_encerrada:
+        print("🚩 Flag finalizar_sessao: TRUE")
     print("=" * 80)
     
-    resposta = {
-        "response": output_text,
-        "botao_profissional": False,
-        "botao_unidade": False
-    }
+    resposta = {"response": output_text}
+    if pesquisa_encerrada:
+        resposta["finalizar_sessao"] = True
     
     return resposta
+
+
+def retornar_botoes_confirmacao(output_text: str) -> dict:
+    """Retorna botões SIM/NÃO para confirmação de agendamento."""
+    print("🎯 BOTÕES DE CONFIRMAÇÃO - Retornando opções SIM/NÃO em JSON")
+    print("=" * 80)
+    
+    opcoes = {
+        "output": {
+            "generic": [{
+                "response_type": "option",
+                "title": output_text,
+                "options": [
+                    {"label": "SIM", "value": {"input": {"text": "SIM"}}},
+                    {"label": "NÃO", "value": {"input": {"text": "NÃO"}}}
+                ]
+            }]
+        },
+        "botao_confirmacao": True
+    }
+    
+    print(f"✅ Botões de confirmação gerados")
+    print(f"📤 RETORNO: {json.dumps(opcoes, ensure_ascii=False, indent=2)}")
+    print("=" * 80)
+    
+    return opcoes
+
+
+def retornar_botoes_reagendar_cancelar(output_text: str) -> dict:
+    """Retorna botões Reagendar/Cancelar."""
+    print("🎯 BOTÕES REAGENDAR/CANCELAR - Retornando opções em JSON")
+    print("=" * 80)
+    
+    opcoes = {
+        "output": {
+            "generic": [{
+                "response_type": "option",
+                "title": output_text,
+                "options": [
+                    {"label": "Reagendar", "value": {"input": {"text": "Reagendar"}}},
+                    {"label": "Cancelar", "value": {"input": {"text": "Cancelar"}}}
+                ]
+            }]
+        },
+        "botao_reagendar_cancelar": True
+    }
+    
+    print(f"✅ Botões reagendar/cancelar gerados")
+    print(f"📤 RETORNO: {json.dumps(opcoes, ensure_ascii=False, indent=2)}")
+    print("=" * 80)
+    
+    return opcoes
+
+
+def retornar_botoes_no_show(output_text: str) -> dict:
+    """Retorna botões SIM/NÃO para no show."""
+    print("🎯 BOTÕES NO SHOW - Retornando opções SIM/NÃO em JSON")
+    print("=" * 80)
+    
+    opcoes = {
+        "output": {
+            "generic": [{
+                "response_type": "option",
+                "title": output_text,
+                "options": [
+                    {"label": "SIM", "value": {"input": {"text": "SIM"}}},
+                    {"label": "NÃO", "value": {"input": {"text": "NÃO"}}}
+                ]
+            }]
+        },
+        "botao_confirmacao_no_show": True
+    }
+    
+    print(f"✅ Botões no show gerados")
+    print(f"📤 RETORNO: {json.dumps(opcoes, ensure_ascii=False, indent=2)}")
+    print("=" * 80)
+    
+    return opcoes
 
 
 # =========================
@@ -127,6 +207,8 @@ class ChatRequest(BaseModel):
     conversation_id: str
     message: Union[str, dict, Any]
     phone: Optional[str] = Field(default=None)
+    tituloHSM: Optional[str] = Field(default=None)
+    respostaHSM: Optional[str] = Field(default=None)
 
 
 # =========================
@@ -234,19 +316,57 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
             "botao_unidade": False
         }
 
+    # ROTEAMENTO DE AGENTES BASEADO EM tituloHSM
+    # Adiciona tituloHSM e respostaHSM ao contexto se fornecidos
+    if req.tituloHSM:
+        context["tituloHSM"] = req.tituloHSM
+        update_context(conversation_id, {"tituloHSM": req.tituloHSM})
+    
+    if req.respostaHSM:
+        context["respostaHSM"] = req.respostaHSM
+        update_context(conversation_id, {"respostaHSM": req.respostaHSM})
+    
+    # Seleciona o agente baseado no tituloHSM
+    titulo_hsm = context.get("tituloHSM") or req.tituloHSM
+    
+    if titulo_hsm == "nps_buddha":
+        agente_atual = nps_agent
+        nome_agente = "NPS"
+        print("🎯 Agente selecionado: NPS")
+    
+    elif titulo_hsm == "confirmacao_buddha":
+        agente_atual = confirmacao_agent
+        nome_agente = "CONFIRMAÇÃO"
+        print("🎯 Agente selecionado: CONFIRMAÇÃO")
+    
+    elif titulo_hsm == "no_show_sem_consumo_voucher":
+        agente_atual = no_show_agent
+        nome_agente = "NO SHOW"
+        print("🎯 Agente selecionado: NO SHOW")
+    
+    else:
+        # Fallback para NPS se não houver tituloHSM
+        agente_atual = nps_agent
+        nome_agente = "NPS (fallback)"
+        print("⚠️  Nenhum tituloHSM fornecido - usando NPS como fallback")
+    
     # Prepara dependências
     context.setdefault("session_id", conversation_id)
     deps = MyDeps(**context)
     
     print("=" * 80)
-    print("📨 NPS - Nova mensagem")
+    print(f"� {nome_agente} - Nova mensagem")
     print(f"Conversation ID: {conversation_id}")
     print(f"Mensagem: {message}")
     print(f"Histórico: {len(history)} mensagens")
+    if req.tituloHSM:
+        print(f"tituloHSM: {req.tituloHSM}")
+    if req.respostaHSM:
+        print(f"respostaHSM: {req.respostaHSM}")
     print("=" * 80)
     
-    # Executa o agente NPS (agora ele gera a primeira mensagem também)
-    result = await nps_agent.run(
+    # Executa o agente selecionado
+    result = await agente_atual.run(
         message,
         message_history=history,
         deps=deps
@@ -335,6 +455,46 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # Aqui detectamos e retornamos as opções de avaliação da unidade em JSON
     if context_updated.get("nota_unidade_ativa", False):
         return retornar_segunda_pergunta(output_text)
+    
+    # =========================================================================
+    # DETECÇÃO DE FLAGS DOS NOVOS AGENTES
+    # =========================================================================
+    
+    # Flag: botao_confirmacao (Confirmação - SIM/NÃO)
+    if context_updated.get("botao_confirmacao"):
+        return retornar_botoes_confirmacao(output_text)
+    
+    # Flag: botao_reagendar_cancelar (Confirmação - Reagendar/Cancelar)
+    if context_updated.get("botao_reagendar_cancelar"):
+        return retornar_botoes_reagendar_cancelar(output_text)
+    
+    # Flag: botao_confirmacao_no_show (No Show - SIM/NÃO)
+    if context_updated.get("botao_confirmacao_no_show"):
+        return retornar_botoes_no_show(output_text)
+    
+    # Flag: ir_para_reagendamento (Transbordo)
+    if context_updated.get("ir_para_reagendamento"):
+        print("🚩 FLAG DETECTADA: ir_para_reagendamento = TRUE")
+        return {
+            "response": output_text,
+            "ir_para_reagendamento": True
+        }
+    
+    # Flag: ir_para_cancelamento (Transbordo)
+    if context_updated.get("ir_para_cancelamento"):
+        print("🚩 FLAG DETECTADA: ir_para_cancelamento = TRUE")
+        return {
+            "response": output_text,
+            "ir_para_cancelamento": True
+        }
+    
+    # Flag: ir_para_reagendamento_no_show (Transbordo)
+    if context_updated.get("ir_para_reagendamento_no_show"):
+        print("🚩 FLAG DETECTADA: ir_para_reagendamento_no_show = TRUE")
+        return {
+            "response": output_text,
+            "ir_para_reagendamento_no_show": True
+        }
     
     # =========================================================================
     # RESPOSTA NORMAL (SEM OPÇÕES)
