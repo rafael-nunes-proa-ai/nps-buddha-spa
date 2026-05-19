@@ -245,13 +245,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     print(f"Histórico: {len(history)} mensagens")
     print("=" * 80)
     
-    # =========================================================================
-    # ETAPA 1: PRIMEIRA MENSAGEM - OPÇÕES PROFISSIONAL
-    # =========================================================================
-    if len(history) == 0:
-        return retornar_primeira_pergunta(conversation_id, message, context)
-    
-    # Executa o agente NPS
+    # Executa o agente NPS (agora ele gera a primeira mensagem também)
     result = await nps_agent.run(
         message,
         message_history=history,
@@ -294,6 +288,45 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     
     print(f"✅ NPS - Resposta: {output_text}")
     print("=" * 80)
+    
+    # =========================================================================
+    # VERIFICAÇÃO: Se usuário não respondeu com nota válida, reenviar opções
+    # =========================================================================
+    nota_prof_atual = context_updated.get("nota_profissional")
+    nota_unid_atual = context_updated.get("nota_unidade")
+    
+    # Se ainda não tem nota profissional (primeira pergunta ou reenvio)
+    if nota_prof_atual is None:
+        print("⚠️  NOTA PROFISSIONAL NÃO VALIDADA - Retornando opções com mensagem do agente")
+        print("=" * 80)
+        
+        # Retorna a mensagem do agente com botões
+        opcoes_resposta = {
+            "output": {
+                "generic": [{
+                    "response_type": "option",
+                    "title": output_text,
+                    "options": [
+                        {"label": "5", "value": {"input": {"text": "5"}}},
+                        {"label": "4", "value": {"input": {"text": "4"}}},
+                        {"label": "3", "value": {"input": {"text": "3"}}},
+                        {"label": "2", "value": {"input": {"text": "2"}}},
+                        {"label": "1", "value": {"input": {"text": "1"}}}
+                    ]
+                }]
+            },
+            "botao_profissional": True
+        }
+        
+        print(f"📤 RETORNO: {json.dumps(opcoes_resposta, ensure_ascii=False, indent=2)}")
+        print("=" * 80)
+        return opcoes_resposta
+    
+    # Se tem nota profissional mas não tem nota unidade
+    if nota_prof_atual is not None and nota_unid_atual is None and len(history) >= 6:
+        print("⚠️  NOTA UNIDADE NÃO VALIDADA - Reenviando opções")
+        print("=" * 80)
+        return retornar_segunda_pergunta(output_text)
     
     # =========================================================================
     # ETAPA 2: SEGUNDA PERGUNTA - OPÇÕES UNIDADE
