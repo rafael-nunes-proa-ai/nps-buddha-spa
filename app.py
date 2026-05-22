@@ -9,9 +9,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from typing import Optional, Union, Any
 
-from agents.agente_nps import nps_agent
-from agents.agente_confirmacao import confirmacao_agent
-from agents.agente_no_show import no_show_agent
+from agents.agente_nps import nps_agent, confirmacao_agent, no_show_agent
 from agents.deps import MyDeps
 from security.auth import verificar_api_key
 from store.database import (
@@ -406,55 +404,54 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         except:
             context_updated = {}
     
-    print(f"✅ NPS - Resposta: {output_text}")
+    print(f"✅ {nome_agente} - Resposta: {output_text}")
     print("=" * 80)
     
     # =========================================================================
-    # VERIFICAÇÃO: Se usuário não respondeu com nota válida, reenviar opções
+    # LÓGICA ESPECÍFICA DO AGENTE NPS
     # =========================================================================
-    nota_prof_atual = context_updated.get("nota_profissional")
-    nota_unid_atual = context_updated.get("nota_unidade")
-    
-    # Se ainda não tem nota profissional (primeira pergunta ou reenvio)
-    if nota_prof_atual is None:
-        print("⚠️  NOTA PROFISSIONAL NÃO VALIDADA - Retornando opções com mensagem do agente")
-        print("=" * 80)
+    if titulo_hsm == "nps_buddha" or titulo_hsm is None:
+        # VERIFICAÇÃO: Se usuário não respondeu com nota válida, reenviar opções
+        nota_prof_atual = context_updated.get("nota_profissional")
+        nota_unid_atual = context_updated.get("nota_unidade")
         
-        # Retorna a mensagem do agente com botões
-        opcoes_resposta = {
-            "output": {
-                "generic": [{
-                    "response_type": "option",
-                    "title": output_text,
-                    "options": [
-                        {"label": "5", "value": {"input": {"text": "5"}}},
-                        {"label": "4", "value": {"input": {"text": "4"}}},
-                        {"label": "3", "value": {"input": {"text": "3"}}},
-                        {"label": "2", "value": {"input": {"text": "2"}}},
-                        {"label": "1", "value": {"input": {"text": "1"}}}
-                    ]
-                }]
-            },
-            "botao_profissional": True
-        }
+        # Se ainda não tem nota profissional (primeira pergunta ou reenvio)
+        if nota_prof_atual is None:
+            print("⚠️  NOTA PROFISSIONAL NÃO VALIDADA - Retornando opções com mensagem do agente")
+            print("=" * 80)
+            
+            # Retorna a mensagem do agente com botões
+            opcoes_resposta = {
+                "output": {
+                    "generic": [{
+                        "response_type": "option",
+                        "title": output_text,
+                        "options": [
+                            {"label": "5", "value": {"input": {"text": "5"}}},
+                            {"label": "4", "value": {"input": {"text": "4"}}},
+                            {"label": "3", "value": {"input": {"text": "3"}}},
+                            {"label": "2", "value": {"input": {"text": "2"}}},
+                            {"label": "1", "value": {"input": {"text": "1"}}}
+                        ]
+                    }]
+                },
+                "botao_profissional": True
+            }
+            
+            print(f"📤 RETORNO: {json.dumps(opcoes_resposta, ensure_ascii=False, indent=2)}")
+            print("=" * 80)
+            return opcoes_resposta
         
-        print(f"📤 RETORNO: {json.dumps(opcoes_resposta, ensure_ascii=False, indent=2)}")
-        print("=" * 80)
-        return opcoes_resposta
-    
-    # Se tem nota profissional mas não tem nota unidade
-    if nota_prof_atual is not None and nota_unid_atual is None and len(history) >= 6:
-        print("⚠️  NOTA UNIDADE NÃO VALIDADA - Reenviando opções")
-        print("=" * 80)
-        return retornar_segunda_pergunta(output_text)
-    
-    # =========================================================================
-    # ETAPA 2: SEGUNDA PERGUNTA - OPÇÕES UNIDADE
-    # =========================================================================
-    # Após validar nota do profissional, a tool marca nota_unidade_ativa=True
-    # Aqui detectamos e retornamos as opções de avaliação da unidade em JSON
-    if context_updated.get("nota_unidade_ativa", False):
-        return retornar_segunda_pergunta(output_text)
+        # Se tem nota profissional mas não tem nota unidade
+        if nota_prof_atual is not None and nota_unid_atual is None and len(history) >= 6:
+            print("⚠️  NOTA UNIDADE NÃO VALIDADA - Reenviando opções")
+            print("=" * 80)
+            return retornar_segunda_pergunta(output_text)
+        
+        # ETAPA 2: SEGUNDA PERGUNTA - OPÇÕES UNIDADE (NPS)
+        # Após validar nota do profissional, a tool marca nota_unidade_ativa=True
+        if context_updated.get("nota_unidade_ativa", False):
+            return retornar_segunda_pergunta(output_text)
     
     # =========================================================================
     # DETECÇÃO DE FLAGS DOS NOVOS AGENTES
