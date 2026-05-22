@@ -99,9 +99,13 @@ def processar_escolha_reagendar_cancelar(ctx: RunContext[MyDeps], escolha: str) 
     if "reagendar" in escolha_lower or "remarcar" in escolha_lower:
         print("✅ Cliente escolheu REAGENDAR")
         print("🚩 Ativando flag ir_para_reagendamento")
+        print("🚫 Desativando flag botao_reagendar_cancelar")
         
-        # Atualiza contexto com flag de transbordo
-        update_context(conversation_id, {"ir_para_reagendamento": True})
+        # Atualiza contexto: ativa transbordo e desativa botões
+        update_context(conversation_id, {
+            "ir_para_reagendamento": True,
+            "botao_reagendar_cancelar": False
+        })
         
         print("=" * 80)
         return "REAGENDAR"
@@ -109,9 +113,13 @@ def processar_escolha_reagendar_cancelar(ctx: RunContext[MyDeps], escolha: str) 
     elif "cancelar" in escolha_lower or "desmarcar" in escolha_lower:
         print("✅ Cliente escolheu CANCELAR")
         print("🚩 Ativando flag ir_para_cancelamento")
+        print("🚫 Desativando flag botao_reagendar_cancelar")
         
-        # Atualiza contexto com flag de transbordo
-        update_context(conversation_id, {"ir_para_cancelamento": True})
+        # Atualiza contexto: ativa transbordo e desativa botões
+        update_context(conversation_id, {
+            "ir_para_cancelamento": True,
+            "botao_reagendar_cancelar": False
+        })
         
         print("=" * 80)
         return "CANCELAR"

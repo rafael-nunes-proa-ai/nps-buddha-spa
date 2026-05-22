@@ -332,7 +332,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         nome_agente = "NPS"
         print("🎯 Agente selecionado: NPS")
     
-    elif titulo_hsm == "confirmacao_buddha":
+    elif titulo_hsm == "confirmacao_buddha_v3":
         agente_atual = confirmacao_agent
         nome_agente = "CONFIRMAÇÃO"
         print("🎯 Agente selecionado: CONFIRMAÇÃO")
@@ -352,8 +352,22 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     context.setdefault("session_id", conversation_id)
     deps = MyDeps(**context)
     
+    # Se message estiver vazio e respostaHSM existir, usa respostaHSM como mensagem
+    # Isso só se aplica aos agentes confirmacao e no_show (não ao NPS)
+    mensagem_vazia = (
+        not message or 
+        message == {} or 
+        message == "" or 
+        (isinstance(message, dict) and len(message) == 0) or
+        str(message).strip() == "{}"
+    )
+    
+    if mensagem_vazia and req.respostaHSM and titulo_hsm != "nps_buddha":
+        message = req.respostaHSM
+        print(f"⚠️  Mensagem vazia detectada - usando respostaHSM como mensagem: {message}")
+    
     print("=" * 80)
-    print(f"� {nome_agente} - Nova mensagem")
+    print(f"📬 {nome_agente} - Nova mensagem")
     print(f"Conversation ID: {conversation_id}")
     print(f"Mensagem: {message}")
     print(f"Histórico: {len(history)} mensagens")
