@@ -302,17 +302,18 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
             print("❌ ERRO: Sessão ainda existe após delete_session()")
         
         print("🚩 Flag finalizar_sessao: TRUE")
-        print("📤 Retornando mensagem de encerramento COM NOTAS")
-        print("=" * 80)
-        
-        return {
+        retorno_final = {
             "response": "Obrigado por participar da nossa pesquisa de satisfação! 😊\n\nSua opinião é muito importante para nós!",
             "nota_profissional": context.get('nota_profissional'),
             "nota_unidade": context.get('nota_unidade'),
+            "resposta_feedback_unidade": context.get('resposta_feedback_unidade'),
             "finalizar_sessao": True,
             "botao_profissional": False,
             "botao_unidade": False
         }
+        print(f"📤 RETORNO FINAL: {json.dumps(retorno_final, ensure_ascii=False, indent=2)}")
+        print("=" * 80)
+        return retorno_final
 
     # ROTEAMENTO DE AGENTES BASEADO EM tituloHSM
     # Adiciona tituloHSM e respostaHSM ao contexto se fornecidos
@@ -420,7 +421,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     
     print(f"✅ {nome_agente} - Resposta: {output_text}")
     print("=" * 80)
-    
+
     # =========================================================================
     # LÓGICA ESPECÍFICA DO AGENTE NPS
     # =========================================================================
