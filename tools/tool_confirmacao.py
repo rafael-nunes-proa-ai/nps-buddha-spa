@@ -57,6 +57,8 @@ def validar_confirmacao(ctx: RunContext[MyDeps], resposta: str) -> str:
     
     if any(palavra in resposta_lower for palavra in afirmativas):
         print("✅ Resposta AFIRMATIVA detectada")
+        print("🚩 Marcando mensagem_final_enviada = True")
+        update_context(conversation_id, {"mensagem_final_enviada": True})
         print("=" * 80)
         return "AFIRMATIVA"
     
