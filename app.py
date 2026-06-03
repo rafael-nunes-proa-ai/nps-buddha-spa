@@ -488,6 +488,7 @@ async def post_chat(req: ChatRequest, background_tasks: BackgroundTasks, api_key
     # Flag: ir_para_reagendamento (Transbordo)
     if context_updated.get("ir_para_reagendamento"):
         print("🚩 FLAG DETECTADA: ir_para_reagendamento = TRUE")
+        print(f"🗑️  Agendando deleção da sessão em background: {conversation_id}")
         background_tasks.add_task(delete_session, conversation_id)
         return {
             "response": output_text,
@@ -498,6 +499,7 @@ async def post_chat(req: ChatRequest, background_tasks: BackgroundTasks, api_key
     # Flag: ir_para_cancelamento (Transbordo)
     if context_updated.get("ir_para_cancelamento"):
         print("🚩 FLAG DETECTADA: ir_para_cancelamento = TRUE")
+        print(f"🗑️  Agendando deleção da sessão em background: {conversation_id}")
         background_tasks.add_task(delete_session, conversation_id)
         return {
             "response": output_text,
@@ -508,6 +510,7 @@ async def post_chat(req: ChatRequest, background_tasks: BackgroundTasks, api_key
     # Flag: ir_para_reagendamento_no_show (Transbordo)
     if context_updated.get("ir_para_reagendamento_no_show"):
         print("🚩 FLAG DETECTADA: ir_para_reagendamento_no_show = TRUE")
+        print(f"🗑️  Agendando deleção da sessão em background: {conversation_id}")
         background_tasks.add_task(delete_session, conversation_id)
         return {
             "response": output_text,

@@ -44,6 +44,8 @@ def validar_resposta_no_show(ctx: RunContext[MyDeps], resposta: str) -> str:
     
     elif any(palavra in resposta_lower for palavra in negativas):
         print("✅ Resposta NEGATIVA detectada")
+        print("🚩 Marcando mensagem_final_enviada = True")
+        update_context(conversation_id, {"mensagem_final_enviada": True})
         print("=" * 80)
         return "NEGATIVA"
     
