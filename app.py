@@ -3,7 +3,7 @@ import os
 import logging
 import uvicorn
 import threading
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -219,7 +219,7 @@ async def read_root():
 
 
 @app.post("/chat")
-async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key)):
+async def post_chat(req: ChatRequest, background_tasks: BackgroundTasks, api_key: str = Depends(verificar_api_key)):
     """Endpoint principal para processar mensagens do NPS"""
     from store.database import delete_session
     
@@ -488,6 +488,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # Flag: ir_para_reagendamento (Transbordo)
     if context_updated.get("ir_para_reagendamento"):
         print("🚩 FLAG DETECTADA: ir_para_reagendamento = TRUE")
+        background_tasks.add_task(delete_session, conversation_id)
         return {
             "response": output_text,
             "confirmou_agendamento": context_updated.get("confirmou_agendamento"),
@@ -497,15 +498,17 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
     # Flag: ir_para_cancelamento (Transbordo)
     if context_updated.get("ir_para_cancelamento"):
         print("🚩 FLAG DETECTADA: ir_para_cancelamento = TRUE")
+        background_tasks.add_task(delete_session, conversation_id)
         return {
             "response": output_text,
             "confirmou_agendamento": context_updated.get("confirmou_agendamento"),
             "ir_para_cancelamento": True
         }
-    
+
     # Flag: ir_para_reagendamento_no_show (Transbordo)
     if context_updated.get("ir_para_reagendamento_no_show"):
         print("🚩 FLAG DETECTADA: ir_para_reagendamento_no_show = TRUE")
+        background_tasks.add_task(delete_session, conversation_id)
         return {
             "response": output_text,
             "ir_para_reagendamento_no_show": True
