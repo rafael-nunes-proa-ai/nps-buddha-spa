@@ -41,6 +41,7 @@ class MyDeps:
     respostaHSM: Optional[str] = None  # Resposta inicial do HSM
     
     # CONTROLE DE FLUXO - CONFIRMAÇÃO
+    confirmou_agendamento: Optional[bool] = None  # True = confirmou, False = não confirmou
     botao_confirmacao: Optional[bool] = None  # Flag para exibir botões SIM/NÃO (confirmação)
     botao_reagendar_cancelar: Optional[bool] = None  # Flag para exibir botões Reagendar/Cancelar
     ir_para_reagendamento: Optional[bool] = None  # Flag para transbordo para reagendamento

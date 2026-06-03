@@ -307,6 +307,7 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
             "nota_profissional": context.get('nota_profissional'),
             "nota_unidade": context.get('nota_unidade'),
             "resposta_feedback_unidade": context.get('resposta_feedback_unidade'),
+            "confirmou_agendamento": context.get('confirmou_agendamento'),
             "finalizar_sessao": True,
             "botao_profissional": False,
             "botao_unidade": False
@@ -489,14 +490,16 @@ async def post_chat(req: ChatRequest, api_key: str = Depends(verificar_api_key))
         print("🚩 FLAG DETECTADA: ir_para_reagendamento = TRUE")
         return {
             "response": output_text,
+            "confirmou_agendamento": context_updated.get("confirmou_agendamento"),
             "ir_para_reagendamento": True
         }
-    
+
     # Flag: ir_para_cancelamento (Transbordo)
     if context_updated.get("ir_para_cancelamento"):
         print("🚩 FLAG DETECTADA: ir_para_cancelamento = TRUE")
         return {
             "response": output_text,
+            "confirmou_agendamento": context_updated.get("confirmou_agendamento"),
             "ir_para_cancelamento": True
         }
     
